@@ -2,8 +2,9 @@
 mod messages;
 mod errors;
 
-use std::{net::TcpStream, io::{BufReader, BufRead, Read}, error::Error, str::Chars};
+use std::{net::TcpStream, io::{BufReader, BufRead, Read}, error::Error, str::Chars, time::Duration};
 use errors::BError;
+use messages::ClientMessage;
 
 use crate::messages::ClientMessageType;
 
@@ -30,11 +31,33 @@ fn main() {
 
 type Buffer<'a> = BufReader<&'a mut TcpStream>;
 
-pub fn handle_server(mut stream: TcpStream) {
-    let buf_reader = BufReader::new(&mut stream);
+enum BTimeout { Normal, Refilling, }
+impl BTimeout {
+    fn value(self) -> Duration {
+        let secs = match self {
+            Self::Normal => 1,
+            Self::Refilling => 5,
+        };
+        Duration::from_secs(secs)
+    }
 }
 
-fn read_message(buffer: &mut Buffer) -> Result<ClientMessageType, BError> {
+pub fn handle_server(mut stream: TcpStream) {
+    stream.set_read_timeout(Some(BTimeout::Normal.value())).unwrap();
+    let mut buf_reader = BufReader::new(&mut stream);
+
+    loop {
+        match read_message(&mut buf_reader) {
+            Ok(_) => {}
+            Err(e) => {
+                server_send_error(stream, e);
+                return;
+            }
+        }
+    }
+}
+
+fn read_message(buffer: &mut Buffer) -> Result<ClientMessage, BError> {
     let mut header = Vec::<u8>::new();
     loop {
         let mut byte = [0; 1];
@@ -49,7 +72,8 @@ fn read_message(buffer: &mut Buffer) -> Result<ClientMessageType, BError> {
 
                 if last == 7u8 {
                     header.pop();
-                    return ClientMessageType::by_name(header.clone());
+                    return ClientMessageType::by_name(header.clone())
+                        .and_then(|mem_type| mem_type.process(vec![]));
                 } else {
                     panic!("\\b alone in message name");
                 }
@@ -81,7 +105,7 @@ fn read_message(buffer: &mut Buffer) -> Result<ClientMessageType, BError> {
 
                 if last == 7u8 {
                     message.pop();
-                    return ClientMessageType::by_name(message);
+                    return mes_type.process(message);
                 } else {
                     panic!("\\b alone in the body");
                 }
@@ -98,3 +122,6 @@ fn unwrap_io<T>(res: Result<T, std::io::Error>) -> Result<T, BError> {
     }
 }
 
+fn server_send_error(stream: TcpStream, e : BError) {
+    stream.shutdown(std::net::Shutdown::Both).unwrap();
+}

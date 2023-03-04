@@ -1,6 +1,16 @@
 
 use crate::errors::BError;
 
+pub enum ClientMessage {
+    Username(String),
+    KeyID(String),
+    Confirmation(i16),
+    NoProblemo { x: i32, y: i32, },
+    Recharging,
+    FullPower,
+    Secret(String),
+}
+
 pub enum ClientMessageType {
     Username,
     KeyID,
@@ -38,4 +48,41 @@ impl ClientMessageType {
             _ => Err(BError::UnknownMessage(str)),
         }
     }
+
+    pub fn process(&self, payload: Vec<u8>) -> Result<ClientMessage, BError> {
+        let str = String::from_utf8(payload).unwrap();
+        let main = match self {
+            ClientMessageType::Username => 
+                ClientMessage::Username(str),
+            ClientMessageType::KeyID => 
+                ClientMessage::KeyID(str),
+            ClientMessageType::Confirmation => 
+                ClientMessage::Confirmation(Self::parse_confirmation(&str)?),
+            ClientMessageType::NoProblemo => 
+                Self::parse_xy(&str)
+                .map(|(x,y)| ClientMessage::NoProblemo{x, y})?,
+            ClientMessageType::Recharging =>
+                ClientMessage::Recharging,
+            ClientMessageType::FullPower =>
+                ClientMessage::FullPower,
+            ClientMessageType::Secret =>
+                ClientMessage::Secret(str)
+        };
+
+        Ok(main)
+    }
+
+    fn parse_confirmation(str: &str) -> Result<i16, BError>{ 
+        str.parse::<i16>()
+            .map_err(|e| BError::FailedToParseNumber(e))
+    }
+
+    fn parse_xy(str: &str) -> Result<(i32, i32), BError> {
+        let (x_str, y_str) = str.split_once(' ').ok_or(BError::FailedToSplit)?;
+        let x = x_str.parse().map_err(|e| BError::FailedToParseNumber(e))?;
+        let y = y_str.parse().map_err(|e| BError::FailedToParseNumber(e))?;
+
+        Ok((x, y))
+    }
 }
+
