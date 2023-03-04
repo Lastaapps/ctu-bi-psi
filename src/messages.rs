@@ -1,5 +1,9 @@
 
 #[derive(Debug)]
+pub struct ClientMessage(pub String);
+
+
+#[derive(Debug)]
 pub enum ServerMessage {
     Confirm(u32),
     Move,

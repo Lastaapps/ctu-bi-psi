@@ -1,6 +1,6 @@
 use std::num::ParseIntError;
 
-use crate::{client_messages::ClientMessage, server_messages::ServerMessage};
+use crate::messages::{ClientMessage, ServerMessage};
 
 #[derive(Debug)]
 pub enum BError {
@@ -10,8 +10,9 @@ pub enum BError {
     FailedToParseNumber(ParseIntError),
     FailedToSplit,
     UnexpectedResponse(ClientMessage),
-    InvalidKeyIndex(i16),
+    InvalidKeyIndex(i32),
     HashMismatch{expected: u32, actual: u32},
+    ConnectionClosed,
 }
 
 impl BError {
@@ -22,9 +23,11 @@ impl BError {
             Self::MessageToLong(String, usize) => ServerMessage::SyntaxError,
             Self::FailedToParseNumber(ParseIntError) => ServerMessage::SyntaxError,
             Self::FailedToSplit => ServerMessage::SyntaxError,
-            Self::UnexpectedResponse(ClientMessage) => ServerMessage::LogicError,
-            Self::InvalidKeyIndex(i16) => ServerMessage::KeyOutOfRangeError,
+            Self::UnexpectedResponse(_) => ServerMessage::LogicError,
+            Self::InvalidKeyIndex(_) => ServerMessage::KeyOutOfRangeError,
             Self::HashMismatch{..} => ServerMessage::LoginFailed,
+            Self::ConnectionClosed => ServerMessage::LoginFailed,
+
         }
     }
 }
