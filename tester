@@ -1,0 +1,4 @@
+#!/bin/bash
+
+./psi-tester-2023-v7_x64 42069 localhost $1
+
