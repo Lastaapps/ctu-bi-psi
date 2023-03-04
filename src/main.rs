@@ -1,12 +1,18 @@
 
-mod messages;
+mod constants;
+mod client_messages;
 mod errors;
+mod state_machine;
+mod server_messages;
 
-use std::{net::TcpStream, io::{BufReader, BufRead, Read}, error::Error, str::Chars, time::Duration};
+use std::{net::TcpStream, io::{BufReader, BufRead, Read, Write}, error::Error, str::Chars, time::Duration};
+use constants::BTimeout;
 use errors::BError;
-use messages::ClientMessage;
+use client_messages::ClientMessage;
+use server_messages::ServerMessage;
+use state_machine::BState;
 
-use crate::messages::ClientMessageType;
+use crate::client_messages::ClientMessageType;
 
 use std::{net::TcpListener, thread};
 
@@ -29,35 +35,39 @@ fn main() {
     }
 }
 
-type Buffer<'a> = BufReader<&'a mut TcpStream>;
-
-enum BTimeout { Normal, Refilling, }
-impl BTimeout {
-    fn value(self) -> Duration {
-        let secs = match self {
-            Self::Normal => 1,
-            Self::Refilling => 5,
-        };
-        Duration::from_secs(secs)
-    }
-}
-
 pub fn handle_server(mut stream: TcpStream) {
     stream.set_read_timeout(Some(BTimeout::Normal.value())).unwrap();
-    let mut buf_reader = BufReader::new(&mut stream);
+    let mut state = BState::LoginUsername;
 
     loop {
-        match read_message(&mut buf_reader) {
-            Ok(_) => {}
+        let res = read_message(&mut stream)
+            .and_then(|mess| state.handle_message(mess));
+
+        match res {
+            Ok((new_state, action)) => {
+                state = new_state;
+                match action {
+                    state_machine::PRes::SendMessage(message) => 
+                        server_send_message(&mut stream, message),
+
+                    state_machine::PRes::UpdateTimeout(timeout) => 
+                        stream.set_read_timeout(Some(timeout.value())).unwrap(),
+
+                    state_machine::PRes::Finish => {
+                        stream.shutdown(std::net::Shutdown::Both).unwrap();
+                        return;
+                    }
+                }
+            }
             Err(e) => {
-                server_send_error(stream, e);
+                server_send_error(&mut stream, e);
                 return;
             }
         }
     }
 }
 
-fn read_message(buffer: &mut Buffer) -> Result<ClientMessage, BError> {
+fn read_message(buffer: &mut TcpStream) -> Result<ClientMessage, BError> {
     let mut header = Vec::<u8>::new();
     loop {
         let mut byte = [0; 1];
@@ -122,6 +132,18 @@ fn unwrap_io<T>(res: Result<T, std::io::Error>) -> Result<T, BError> {
     }
 }
 
-fn server_send_error(stream: TcpStream, e : BError) {
+fn server_send_message(stream: &mut TcpStream, message: ServerMessage) {
+    let payload = message.to_payload();
+    stream.write_all(&payload).unwrap();
+}
+
+fn server_send_error(stream: &mut TcpStream, e : BError) {
+
+    println!("Error: {:?}", e);
+
+    let to_send = e.server_response();
+    server_send_message(stream, to_send);
+
     stream.shutdown(std::net::Shutdown::Both).unwrap();
 }
+

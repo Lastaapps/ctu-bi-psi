@@ -1,9 +1,10 @@
 
 use crate::errors::BError;
 
+#[derive(Debug)]
 pub enum ClientMessage {
     Username(String),
-    KeyID(String),
+    KeyID(i16),
     Confirmation(i16),
     NoProblemo { x: i32, y: i32, },
     Recharging,
@@ -11,6 +12,7 @@ pub enum ClientMessage {
     Secret(String),
 }
 
+#[derive(Debug)]
 pub enum ClientMessageType {
     Username,
     KeyID,
@@ -55,9 +57,9 @@ impl ClientMessageType {
             ClientMessageType::Username => 
                 ClientMessage::Username(str),
             ClientMessageType::KeyID => 
-                ClientMessage::KeyID(str),
+                ClientMessage::KeyID(Self::bparse(&str)?),
             ClientMessageType::Confirmation => 
-                ClientMessage::Confirmation(Self::parse_confirmation(&str)?),
+                ClientMessage::Confirmation(Self::bparse(&str)?),
             ClientMessageType::NoProblemo => 
                 Self::parse_xy(&str)
                 .map(|(x,y)| ClientMessage::NoProblemo{x, y})?,
@@ -72,7 +74,7 @@ impl ClientMessageType {
         Ok(main)
     }
 
-    fn parse_confirmation(str: &str) -> Result<i16, BError>{ 
+    fn bparse(str: &str) -> Result<i16, BError>{ 
         str.parse::<i16>()
             .map_err(|e| BError::FailedToParseNumber(e))
     }
