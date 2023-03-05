@@ -1,8 +1,37 @@
 use crate::{messages::{ClientMessage, ServerMessage}, state_machine::{BState, PRes}, errors::BError};
 
 #[derive(PartialEq)]
-enum Orient {
+pub enum Orient {
     NORTH, SOUTH, EAST, WEST,
+}
+
+impl Orient {
+    fn left(&self) -> Orient {
+        match self {
+            Self::NORTH => Self::WEST,
+            Self::SOUTH =>Self::EAST,
+            Self::EAST =>Self::NORTH,
+            Self::WEST =>Self::SOUTH,
+        }
+    }
+    fn right(&self) -> Orient {
+        self.left().left().left()
+    }
+    fn is_valid_for(&self, x: i32, y: i32) -> bool {
+        false
+            || (x > 0 && self == &Orient::SOUTH)
+            || (x < 0 && self == &Orient::NORTH)
+            || (y > 0 && self == &Orient::WEST)
+            || (y < 0 && self == &Orient::EAST)
+    }
+    fn move_in(&self, (x, y): (i32, i32)) -> (i32, i32) {
+        match self {
+            Self::NORTH => (x + 1, y + 0),
+            Self::SOUTH => (x - 1, y + 0),
+            Self::EAST =>  (x + 0, y + 1),
+            Self::WEST =>  (x + 0, y - 1),
+        }
+    }
 }
 
 enum PathMessage {
@@ -17,6 +46,7 @@ pub enum PathState {
     FindingPosition,
     FindingOrientation((i32, i32)),
     FindPath((i32, i32), Orient),
+    SetupAxis((i32, i32), Orient),
     FollowAxis((i32, i32), Orient),
 
     DoLeft(Box<PathState>),
@@ -57,17 +87,17 @@ impl PathState {
                         Ok((wp(next_state), wm(message)))
                     },
 
-                    Self::FindingOrientation((my_x, my_y)) => {
-                        if my_x == x && my_y == y {
+                    Self::FindingOrientation((px, py)) => {
+                        if px == x && py == y {
                             let next_state = Self::FindingPosition;
                             let message = ServerMessage::Right;
 
                             Ok((wp(next_state), wm(message)))
                         } else {
-                            let orient = match x - my_x {
+                            let orient = match x - px {
                                 1 => Orient::EAST,
                                 -1 => Orient::WEST,
-                                0 => if y - my_y == 1 {
+                                0 => if y - py == 1 {
                                     Orient::NORTH
                                 } else {
                                     Orient::SOUTH
@@ -82,23 +112,19 @@ impl PathState {
                                     Ok((next_state, wm(message)))
                                 },
                                 (0, _) | (_, 0) => {
-                                    let next_state = Self::FollowAxis((x, y), orient);
+                                    let next_state = Self::SetupAxis((x, y), orient.left());
                                     let message = ServerMessage::Left;
                                     Ok((wp(next_state), wm(message)))
                                 },
                                 _ => {
-                                    let is_valid =
-                                        (x > 0 && orient == Orient::SOUTH)
-                                        || (x < 0 && orient == Orient::NORTH)
-                                        || (y > 0 && orient == Orient::WEST)
-                                        || (y < 0 && orient == Orient::EAST);
+                                    let is_valid = orient.is_valid_for(x, y);
 
                                     if is_valid {
                                         let next_state = Self::FindPath((x, y), orient);
                                         let message = ServerMessage::Move;
                                         Ok((wp(next_state), wm(message)))
                                     } else{
-                                        let next_state = Self::FindPath((x, y), orient);
+                                        let next_state = Self::FindPath((x, y), orient.left().left());
                                         let message = ServerMessage::Left;
                                         let wrapper = Self::DoLeft(Box::new(Self::DoMove(Box::new(next_state))));
                                         Ok((wp(wrapper), wm(message)))
@@ -107,11 +133,92 @@ impl PathState {
                             }
                         }
                     },
-                    _ => panic!()
+
+                    Self::FindPath((px, py), orient) => {
+                        if x == 0 || y == 0 {
+                            let next_state = Self::SetupAxis((x, y), orient.left());
+                            let message = ServerMessage::Left;
+                            Ok((wp(next_state), wm(message)))
+                        } else if px == x && py == y {
+                            if orient.left().is_valid_for(x, y) {
+                                let next_state = Self::DoMove(Box::new(Self::FindPath((x, y), orient.left())));
+                                let message = ServerMessage::Left;
+                                Ok((wp(next_state), wm(message)))
+                            } else {
+                                let next_state = Self::DoMove(Box::new(Self::FindPath((x, y), orient.right())));
+                                let message = ServerMessage::Right;
+                                Ok((wp(next_state), wm(message)))
+                            }
+                        } else {
+                            let next_state = Self::FindPath((x, y), orient);
+                            let message = ServerMessage::Move;
+                            Ok((wp(next_state), wm(message)))
+                        }
+                    }
+
+                    Self::SetupAxis((px, py), orient) => {
+                        if x == 0 && y == 0 {
+                            let next_state = BState::Extract;
+                            let message = ServerMessage::PickUp;
+                            Ok((next_state, wm(message)))
+                        } else {
+                            if orient.is_valid_for(x, y) {
+                                let next_state = Self::FollowAxis((x, y), orient);
+                                let message = ServerMessage::Move;
+                                Ok((wp(next_state), wm(message)))
+                            } else {
+                                let next_state = Self::SetupAxis((x, y), orient.left());
+                                let message = ServerMessage::Left;
+                                Ok((wp(next_state), wm(message)))
+                            }
+                        }
+                    }
+
+                    Self::FollowAxis((px, py), orient) => {
+                        if x == 0 && y == 0 {
+                            let next_state = BState::Extract;
+                            let message = ServerMessage::PickUp;
+                            Ok((next_state, wm(message)))
+                        } else if px == x && py == y {
+                            let coord = orient.move_in(orient.move_in((x, y)));
+                            let next_state = do_m(do_r(do_m(do_m(do_r(do_m(do_l(do_m(Self::FollowAxis(coord, orient)))))))));
+                            let message = ServerMessage::Left;
+                            Ok((wp(next_state), wm(message)))
+                        } else {
+                            let next_state = Self::FollowAxis((x, y), orient);
+                            let message = ServerMessage::Move;
+                            Ok((wp(next_state), wm(message)))
+                        }
+                    }
+
+                    Self::DoLeft(next_state) => {
+                        let message = ServerMessage::Left;
+                        Ok((wp(*next_state), wm(message)))
+                    }
+                    Self::DoRight(next_state) => {
+                        let message = ServerMessage::Right;
+                        Ok((wp(*next_state), wm(message)))
+                    }
+                    Self::DoMove(next_state) => {
+                        let message = ServerMessage::Move;
+                        Ok((wp(*next_state), wm(message)))
+                    }
                 }
             }
         }
     }
+}
+
+fn do_m(state: PathState) -> PathState {
+    PathState::DoMove(Box::new(state))
+}
+
+fn do_l(state: PathState) -> PathState {
+    PathState::DoLeft(Box::new(state))
+}
+
+fn do_r(state: PathState) -> PathState {
+    PathState::DoRight(Box::new(state))
 }
 
 fn wp(state: PathState) -> BState {
