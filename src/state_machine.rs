@@ -109,11 +109,3 @@ fn parse_confirmation(str: &str) -> Result<i32, BError> {
         .map_err(|e| BError::FailedToParseNumber(e))
 }
 
-fn parse_xy(str: &str) -> Result<(i32, i32), BError> {
-    let (x_str, y_str) = str.split_once(' ').ok_or(BError::FailedToSplit)?;
-    let x = x_str.parse().map_err(|e| BError::FailedToParseNumber(e))?;
-    let y = y_str.parse().map_err(|e| BError::FailedToParseNumber(e))?;
-
-    Ok((x, y))
-}
-

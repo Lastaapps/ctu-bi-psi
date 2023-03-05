@@ -33,6 +33,7 @@ fn main() {
 }
 
 pub fn handle_server(mut stream: TcpStream) {
+    stream.set_write_timeout(Some(BTimeout::Normal.value())).unwrap();
     stream.set_read_timeout(Some(BTimeout::Normal.value())).unwrap();
     stream.set_nodelay(true).unwrap();
 
@@ -55,11 +56,14 @@ pub fn handle_server(mut stream: TcpStream) {
                             server_send_message(&mut stream, message)
                         },
 
-                    state_machine::PRes::UpdateTimeout(timeout) => 
-                        stream.set_read_timeout(Some(timeout.value())).unwrap(),
+                    state_machine::PRes::UpdateTimeout(timeout) =>  {
+                        stream.set_write_timeout(Some(timeout.value())).unwrap();
+                        stream.set_read_timeout(Some(timeout.value())).unwrap();
+                    },
 
                     state_machine::PRes::Finish(message) => {
-                        print!("The message was {}", message);
+                        println!("The message was \"{}\"", message);
+                        server_send_message(&mut stream, ServerMessage::Logout);
                         server_shutdown(&stream);
                         return;
                     }
@@ -127,12 +131,9 @@ fn server_send_error(stream: &mut TcpStream, error : BError) {
 
     println!("Error: {:?}", error);
 
-    match error {
-        BError::ConnectionClosed => {}
-        _ =>  {
-            let to_send = error.server_response();
-            server_send_message(stream, to_send);
-        }
+    if error.should_send() {
+        let to_send = error.server_response();
+        server_send_message(stream, to_send);
     }
 
     server_shutdown(stream);

@@ -1,0 +1,51 @@
+Ideal situation (2 - mandatory):
+		Test 1 - Ideal situation: Fail
+
+	Authentication (2 - mandatory):
+		Test 2 - Wrong confirmation: OK
+		Test 3 - Key is out or range: OK
+		Test 4 - Strange username: Fail
+
+	Segmenting and merging (2 - mandatory):
+		Test 5 - Segmentation: Fail
+		Test 6 - Merging: Fail
+		Test 7 - Segmentation + merging: Fail
+
+	Timeout checking (2 - mandatory):
+		Test 8 - Client confirmation is not sent: Fail
+		Test 9 - Unfinished message: Fail
+
+	Movement (2 - mandatory):
+		Test 10 - Constant obstacles 1: Fail
+		Test 11 - Constant obstacles 2: Fail
+		Test 12 - Constant obstacles 3: Fail
+		Test 13 - Random obstacles: Fail
+
+	Syntax errors (1):
+		Test 14 - Max length of username: OK
+		Test 15 - The key is not a number: OK
+		Test 16 - Space after confirmation: OK
+		Test 17 - Six digit confirmation: OK
+		Test 18 - Floating point coordinates: OK
+		Test 19 - Unexpected space: OK
+
+	Optimization (2):
+		Test 20 - Max length of username exceeded: OK
+		Test 21 - Max length of secret exceeded: Fail
+		Test 22 - Max length of confirmation exceeded: OK
+
+	Recharging (3):
+		Test 23 - After username: Fail
+		Test 24 - After username with expiration: Fail
+		Test 25 - Every five moves: Fail
+		Test 26 - Random intervals: Fail
+		Test 27 - Logic error: Fail
+
+	Multithreading (1):
+		Test 28 - Constant obstacles 1 - three threads: Fail
+
+	Everything random (1):
+		Test 29 - Fully random: Fail
+
+	The final test (2):
+		Test 30 - Fully random - three threads: Fail

@@ -17,6 +17,7 @@ pub enum ServerMessage {
     SyntaxError,
     LogicError,
     KeyOutOfRangeError,
+    Empty,
 }
 
 impl ServerMessage {
@@ -34,6 +35,7 @@ impl ServerMessage {
             Self::SyntaxError => "301 SYNTAX ERROR".to_string(),
             Self::LogicError => "302 LOGIC ERROR".to_string(),
             Self::KeyOutOfRangeError => "303 KEY OUT OF RANGE".to_string(),
+            Self::Empty => "".to_string(),
         };
         let mut bytes = body.as_bytes().to_vec();
         bytes.push(7); // \a

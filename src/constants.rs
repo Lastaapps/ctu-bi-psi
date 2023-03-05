@@ -3,7 +3,7 @@ use std::time::Duration;
 
 pub enum BTimeout { Normal, Refilling, }
 impl BTimeout {
-    pub fn value(self) -> Duration {
+    pub fn value(&self) -> Duration {
         let secs = match self {
             Self::Normal => 1,
             Self::Refilling => 5,
