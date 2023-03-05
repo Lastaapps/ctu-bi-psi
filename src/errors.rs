@@ -8,10 +8,9 @@ pub enum BError {
     ConnectionClosed,
 
     MessageToLong(String, usize),
-    FailedToParseNumber(ParseIntError),
+    FailedToParseNumber(Option<ParseIntError>),
     FailedToSplit,
 
-    UnexpectedResponse(String),
     InvalidKeyIndex(i32),
     HashMismatch{expected: u32, actual: u32},
 
@@ -37,7 +36,6 @@ impl BError {
             Self::FailedToParseNumber(_) => ServerMessage::SyntaxError,
             Self::FailedToSplit => ServerMessage::SyntaxError,
 
-            Self::UnexpectedResponse(_) => ServerMessage::SyntaxError,
             Self::InvalidKeyIndex(_) => ServerMessage::KeyOutOfRangeError,
             Self::HashMismatch {..} => ServerMessage::LoginFailed,
 

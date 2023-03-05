@@ -4,6 +4,7 @@ use crate::errors::BError;
 use crate::messages::{ClientMessage, ServerMessage};
 use crate::state_machine::BState;
 
+use std::cmp::min;
 use std::{net::TcpStream, io::{Read, Write}};
 
 use crate::state_machine;
@@ -53,15 +54,35 @@ pub fn handle_server(mut stream: TcpStream) {
     }
 }
 
+fn check_max_len_overflow(max_len: usize, message: &Vec<u8>) -> bool {
+    let len = message.len();
+    (max_len - 2 < len) && !(message[max_len - 2] == 7u8 && max_len - 1 == len)
+}
+
+fn prefix_match(msg1: &Vec<u8>, msg2: &Vec<u8>) -> bool {
+    let len = min(msg1.len(), msg2.len());
+    for i in 0..len {
+        if msg1[i] != msg2[i] {
+            return false
+        }
+    }
+    true
+}
+
 fn read_message(stream: &mut TcpStream, max_len: usize) -> Result<ClientMessage, BError> {
     let mut message = Vec::<u8>::new();
+    let recharching_bytes = "RECHARGING".as_bytes().to_vec();
+    let full_power_bytes = "FULL POWER".as_bytes().to_vec();
 
     loop {
-        let len = message.len();
-        if max_len - 2 < len {
-            if !(message[max_len - 2] == 7u8 && max_len - 1 == len) {
-                return Err(BError::MessageToLong(String::from_utf8(message).unwrap(), len));
-            }
+        let is_normal_overflow = check_max_len_overflow(max_len, &message);
+        let is_charging = !check_max_len_overflow(12, &message) && 
+            (prefix_match(&message, &recharching_bytes)
+             || prefix_match(&message, &full_power_bytes));
+
+        if is_normal_overflow && !is_charging {
+            let len = message.len();
+            return Err(BError::MessageToLong(String::from_utf8(message).unwrap(), len));
         }
 
         let mut bytes = [0; 1];

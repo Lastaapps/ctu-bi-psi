@@ -12,12 +12,12 @@ pub enum PRes {
 }
 
 pub enum BState {
-    Recharging(Box<BState>),
     LoginUsername,
     LoginKey { username: String },
     LoginValidation { expected_hash: u32 },
     FindPath(PathState),
     Extract,
+    Recharging(Box<BState>),
 }
 
 impl BState {
@@ -38,6 +38,23 @@ impl BState {
     }
 
     pub fn handle_message(self, message: ClientMessage) -> Result<(BState, PRes), BError> {
+        
+        match message.0.as_str() {
+            "RECHARGING" => {
+                if let Self::Recharging(_) = self {
+                    return Err(BError::ChargingInCharging);
+                }
+                return Ok((BState::Recharging(Box::new(self)), PRes::UpdateTimeout(BTimeout::Refilling)));
+            },
+            "FULL POWER" => {
+                if let Self::Recharging(next_state) = self {
+                    return Ok((*next_state, PRes::UpdateTimeout(BTimeout::Normal)));
+                }
+                return Err(BError::ChargingFullInvalidState);
+            },
+            _ => {}
+        }
+
         match self {
             Self::LoginUsername => {
 
@@ -92,7 +109,8 @@ impl BState {
                 Ok((next_state, message))
             }
             Self::FindPath(state) => state.handle_message(message),
-            Self::Extract => Ok((self, PRes::Finish(message.0, ServerMessage::Logout)))
+            Self::Extract => Ok((self, PRes::Finish(message.0, ServerMessage::Logout))),
+            Self::Recharging(_) => Err(BError::MessageWhileCharging),
         }
     }
 }
@@ -107,11 +125,11 @@ fn login_hash(username: &str, secret: &ServerSecret) -> (u32, u32){
 
 fn parse_key_id(str: &str) -> Result<i32, BError>{ 
     str.parse::<i32>()
-        .map_err(|e| BError::FailedToParseNumber(e))
+        .map_err(|e| BError::FailedToParseNumber(Some(e)))
 }
 
 fn parse_confirmation(str: &str) -> Result<i32, BError> {
     str.parse::<i32>()
-        .map_err(|e| BError::FailedToParseNumber(e))
+        .map_err(|e| BError::FailedToParseNumber(Some(e)))
 }
 
