@@ -33,7 +33,7 @@ impl ServerMessage {
             Self::LoginFailed => "300 LOGIN FAILED".to_string(),
             Self::SyntaxError => "301 SYNTAX ERROR".to_string(),
             Self::LogicError => "302 LOGIC ERROR".to_string(),
-            Self::KeyOutOfRangeError => "03 KEY OUT OF RANGE".to_string(),
+            Self::KeyOutOfRangeError => "303 KEY OUT OF RANGE".to_string(),
         };
         let mut bytes = body.as_bytes().to_vec();
         bytes.push(7); // \a

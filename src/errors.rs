@@ -9,10 +9,13 @@ pub enum BError {
     MessageToLong(String, usize),
     FailedToParseNumber(ParseIntError),
     FailedToSplit,
-    UnexpectedResponse(ClientMessage),
+    UnexpectedResponse(String),
     InvalidKeyIndex(i32),
     HashMismatch{expected: u32, actual: u32},
     ConnectionClosed,
+    MessageWhileCharging,
+    ChargingInCharging,
+    ChargingFullInvalidState,
 }
 
 impl BError {
@@ -27,7 +30,9 @@ impl BError {
             Self::InvalidKeyIndex(_) => ServerMessage::KeyOutOfRangeError,
             Self::HashMismatch{..} => ServerMessage::LoginFailed,
             Self::ConnectionClosed => ServerMessage::LoginFailed,
-
+            Self::MessageWhileCharging => ServerMessage::LoginFailed,
+            Self::ChargingInCharging => ServerMessage::LoginFailed,
+            Self::ChargingFullInvalidState => ServerMessage::LoginFailed,
         }
     }
 }

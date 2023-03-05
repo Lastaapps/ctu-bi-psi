@@ -3,14 +3,14 @@ mod constants;
 mod errors;
 mod state_machine;
 mod messages;
+mod path;
 
-use std::{net::TcpStream, io::{BufReader, BufRead, Read, Write}, error::Error, str::Chars, time::Duration};
 use constants::BTimeout;
 use errors::BError;
 use messages::{ClientMessage, ServerMessage};
 use state_machine::BState;
 
-use std::{net::TcpListener, thread};
+use std::{net::{TcpListener, TcpStream}, thread, io::{Read, Write}};
 
 fn main() {
     let host = "127.0.0.1";
@@ -49,6 +49,11 @@ pub fn handle_server(mut stream: TcpStream) {
                 match action {
                     state_machine::PRes::SendMessage(message) => 
                         server_send_message(&mut stream, message),
+
+                    state_machine::PRes::SendMessages(messages) =>
+                        for message in messages {
+                            server_send_message(&mut stream, message)
+                        },
 
                     state_machine::PRes::UpdateTimeout(timeout) => 
                         stream.set_read_timeout(Some(timeout.value())).unwrap(),

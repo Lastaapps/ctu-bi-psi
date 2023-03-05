@@ -2,18 +2,11 @@
 use crate::constants::{BTimeout, ServerSecret};
 use crate::errors::BError;
 use crate::messages::{ServerMessage, ClientMessage};
-
-enum Orientation {
-    NORTH, SOUTH, EAST, WEST,
-}
-
-struct MapInfo {
-    position: (i32, i32),
-    orientation: Orientation,
-}
+use crate::path::PathState;
 
 pub enum PRes {
     SendMessage(ServerMessage),
+    SendMessages(Vec<ServerMessage>),
     UpdateTimeout(BTimeout),
     Finish(String),
 }
@@ -22,7 +15,8 @@ pub enum BState {
     LoginUsername,
     LoginKey { username: String },
     LoginValidation { expected_hash: u32 },
-    FindDirection
+    FindPath(PathState),
+    Extract,
 }
 
 impl BState {
@@ -32,9 +26,8 @@ impl BState {
             Self::LoginUsername => 20,
             Self::LoginKey {..} => 5,
             Self::LoginValidation {..} => 7,
-            Self::FindDirection => 12,
-            // other movement 12
-            // client message 100
+            Self::FindPath(_) => 12,
+            Self::Extract => 100,
         }
     }
 
@@ -72,7 +65,6 @@ impl BState {
 
                 Ok((next_state, message))
             }
-
             Self::LoginValidation { expected_hash } => {
 
                 println!("x Mach: Validating hash");
@@ -86,12 +78,15 @@ impl BState {
                     })
                 }
 
-                let next_state = Self::FindDirection;
-                let message = PRes::SendMessage(ServerMessage::NoProblemo);
+                let next_state = Self::FindPath(PathState::FindingPosition);
+                let message = PRes::SendMessages(
+                    vec![ServerMessage::NoProblemo, ServerMessage::Left]
+                    );
 
                 Ok((next_state, message))
             }
-            _ => panic!(),
+            Self::FindPath(state) => state.handle_message(message),
+            Self::Extract => Ok((self, PRes::Finish(message.0)))
         }
     }
 }
