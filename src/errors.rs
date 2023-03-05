@@ -37,13 +37,13 @@ impl BError {
             Self::FailedToParseNumber(_) => ServerMessage::SyntaxError,
             Self::FailedToSplit => ServerMessage::SyntaxError,
 
-            Self::UnexpectedResponse(_) => ServerMessage::LogicError,
+            Self::UnexpectedResponse(_) => ServerMessage::SyntaxError,
             Self::InvalidKeyIndex(_) => ServerMessage::KeyOutOfRangeError,
             Self::HashMismatch {..} => ServerMessage::LoginFailed,
 
-            Self::MessageWhileCharging => ServerMessage::LoginFailed,
-            Self::ChargingInCharging => ServerMessage::LoginFailed,
-            Self::ChargingFullInvalidState => ServerMessage::LoginFailed,
+            Self::MessageWhileCharging => ServerMessage::LogicError,
+            Self::ChargingInCharging => ServerMessage::LogicError,
+            Self::ChargingFullInvalidState => ServerMessage::LogicError,
         }
     }
 }

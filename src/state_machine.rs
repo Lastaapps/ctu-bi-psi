@@ -8,10 +8,11 @@ pub enum PRes {
     SendMessage(ServerMessage),
     SendMessages(Vec<ServerMessage>),
     UpdateTimeout(BTimeout),
-    Finish(String),
+    Finish(String, ServerMessage),
 }
 
 pub enum BState {
+    Recharging(Box<BState>),
     LoginUsername,
     LoginKey { username: String },
     LoginValidation { expected_hash: u32 },
@@ -21,12 +22,17 @@ pub enum BState {
 
 impl BState {
 
+    pub fn initial() -> BState {
+        BState::LoginUsername
+    }
+
     pub fn expected_mess_lenth(&self) -> usize {
         match self {
             Self::LoginUsername => 20,
             Self::LoginKey {..} => 5,
             Self::LoginValidation {..} => 7,
             Self::FindPath(_) => 12,
+            Self::Recharging(_) => 12,
             Self::Extract => 100,
         }
     }
@@ -86,7 +92,7 @@ impl BState {
                 Ok((next_state, message))
             }
             Self::FindPath(state) => state.handle_message(message),
-            Self::Extract => Ok((self, PRes::Finish(message.0)))
+            Self::Extract => Ok((self, PRes::Finish(message.0, ServerMessage::Logout)))
         }
     }
 }
